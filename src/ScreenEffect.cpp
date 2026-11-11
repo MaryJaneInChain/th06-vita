@@ -65,6 +65,17 @@ void ScreenEffect::DrawSquare(const ZunRect *rect, ZunColor rectColor)
 {
     VertexDiffuseXyzrhw vertices[4];
 
+    // Full-width squares (fades, menu dimming) also cover the pillarbox bars on a widescreen output
+    const bool fullWidth = rect->left <= 0.0f && rect->right >= GAME_WINDOW_WIDTH;
+    ZunRect wideRect = *rect;
+    if (fullWidth)
+    {
+        const i32 barWidth = g_AnmManager->BeginPillarboxPass();
+        wideRect.left -= barWidth;
+        wideRect.right += barWidth;
+        rect = &wideRect;
+    }
+
     if (g_AnmManager->currentTextureHandle == 0)
     {
         g_AnmManager->SetCurrentTexture(g_AnmManager->dummyTextureHandle);
@@ -102,6 +113,11 @@ void ScreenEffect::DrawSquare(const ZunRect *rect, ZunColor rectColor)
     g_AnmManager->SetColorOp(COMPONENT_RGB, COLOR_OP_MODULATE);
 
     g_AnmManager->SetDepthFunc(DEPTH_FUNC_LEQUAL);
+
+    if (fullWidth)
+    {
+        g_AnmManager->EndPillarboxPass();
+    }
 }
 
 ChainCallbackResult ScreenEffect::CalcFadeOut(ScreenEffect *effect)

@@ -30,8 +30,10 @@ void ZunViewport::Get()
     g_GfxBackend->GetViewport(viewPortGet);
     g_GfxBackend->GetDepthRange(depthRangeGet);
 
-    this->x = (viewPortGet[0] - VIEWPORT_OFF_X) / WIDTH_RESOLUTION_SCALE;
-    this->y = (viewPortGet[1] - VIEWPORT_OFF_Y) / HEIGHT_RESOLUTION_SCALE;
+    // Signed: a viewport left of / above the 4:3 area (e.g. the Vita pillarbox pass) maps to negative game coords,
+    //   and VIEWPORT_OFF_X is unsigned, so the plain subtraction would wrap around.
+    this->x = ((i32)viewPortGet[0] - (i32)VIEWPORT_OFF_X) / WIDTH_RESOLUTION_SCALE;
+    this->y = ((i32)viewPortGet[1] - (i32)VIEWPORT_OFF_Y) / HEIGHT_RESOLUTION_SCALE;
     this->width = viewPortGet[2] / WIDTH_RESOLUTION_SCALE;
     this->height = viewPortGet[3] / HEIGHT_RESOLUTION_SCALE;
     this->minZ = depthRangeGet[0];

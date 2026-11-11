@@ -8,6 +8,7 @@
 #include "i18n.hpp"
 #include "utils.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -44,14 +45,15 @@ void AnmManager::CreateTextureObject()
     g_GfxBackend->SetTextureFilter();
 }
 
-SDL_Surface *AnmManager::LoadToSurfaceWithFormat(const char *filename, SDL_PixelFormatEnum format, u8 **fileData)
+SDL_Surface *AnmManager::LoadToSurfaceWithFormat(const char *filename, SDL_PixelFormatEnum format, u8 **fileData,
+                                                 int isExternalResource)
 {
     u8 *data;
     SDL_Surface *imageSrcSurface;
     SDL_Surface *imageTargetSurface;
     SDL_RWops *rwData;
 
-    data = FileSystem::OpenPath(filename, 0);
+    data = FileSystem::OpenPath(filename, isExternalResource);
 
     if (data == NULL)
     {
@@ -1870,7 +1872,15 @@ ZunResult AnmManager::LoadSurface(i32 surfaceIdx, const char *path)
         this->ReleaseSurface(surfaceIdx);
     }
 
-    this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(path, SDL_PIXELFORMAT_RGB24, NULL);
+#ifdef PLAT_VITA
+    // [vita] prefer an outpainted copy that also covers the pillarbox bars (see ApplySurfaceToColorBuffer)
+    char widePath[128];
+    const char *name = std::strrchr(path, '/');
+    std::snprintf(widePath, sizeof(widePath), "ux0:data/th06/wide/%s", name != NULL ? name + 1 : path);
+    this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(widePath, SDL_PIXELFORMAT_RGB24, NULL, 1);
+    if (this->surfaces[surfaceIdx] == NULL)
+#endif
+        this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(path, SDL_PIXELFORMAT_RGB24, NULL);
 
     if (this->surfaces[surfaceIdx] == NULL)
     {
@@ -2142,26 +2152,76 @@ cleanup:
 }
 
 // Utter mess that needs to be rewritten
+static u32 g_PillarboxSavedGlViewport[4];
+static ZunViewport g_PillarboxSavedViewport;
+
+i32 AnmManager::BeginPillarboxPass()
+{
+    g_GfxBackend->GetViewport(g_PillarboxSavedGlViewport);
+    g_PillarboxSavedViewport = g_Supervisor.viewport;
+
+    // The orthographic mapping is only rebuilt when entering orthographic mode, so leave it (this also flushes
+    //   sprites queued under the old viewport). g_Supervisor.viewport doubles as DrawOrthographic's culling bounds.
+    this->SetProjectionMode(PROJECTION_MODE_PERSPECTIVE);
+
+    const i32 barWidth = (i32)std::ceil(VIEWPORT_OFF_X / WIDTH_RESOLUTION_SCALE);
+    g_Supervisor.viewport.x = -barWidth;
+    g_Supervisor.viewport.y = 0;
+    g_Supervisor.viewport.width = GAME_WINDOW_WIDTH + 2 * barWidth;
+    g_Supervisor.viewport.height = GAME_WINDOW_HEIGHT;
+    g_Supervisor.viewport.Set();
+    return barWidth;
+}
+
+void AnmManager::EndPillarboxPass()
+{
+    this->SetProjectionMode(PROJECTION_MODE_PERSPECTIVE);
+    g_Supervisor.viewport = g_PillarboxSavedViewport;
+    // Restore the exact GL viewport; a ZunViewport Get/Set round trip isn't lossless on Vita
+    g_GfxBackend->SetViewport(g_PillarboxSavedGlViewport[0], g_PillarboxSavedGlViewport[1],
+                              g_PillarboxSavedGlViewport[2], g_PillarboxSavedGlViewport[3]);
+}
+
+// Repeat the image's edge texels into the unused part of its power-of-two texture. Otherwise GL_LINEAR (and
+// GL_REPEAT wrapping at u/v = 0) blends uninitialized texels into the image border: a dark seam once something is
+// drawn right next to it.
+static void PadTextureEdges(const u8 *pixels, i32 w, i32 h, u32 texW, u32 texH)
+{
+    if (texW >= (u32)w + 8)
+    {
+        // 4-texel columns keep each row 12 bytes, a multiple of the default GL_UNPACK_ALIGNMENT
+        u8 *column = new u8[h * 4 * 3];
+        const i32 srcX[2] = {w - 1, 0};
+        const i32 dstX[2] = {w, (i32)texW - 4};
+        for (i32 i = 0; i < 2; i++)
+        {
+            for (i32 y = 0; y < h; y++)
+            {
+                for (i32 k = 0; k < 4; k++)
+                {
+                    std::memcpy(&column[(y * 4 + k) * 3], &pixels[(y * w + srcX[i]) * 3], 3);
+                }
+            }
+            g_GfxBackend->SetTextureSubImage(dstX[i], 0, 4, h, column);
+        }
+        delete[] column;
+    }
+    if (texH >= (u32)h + 2)
+    {
+        g_GfxBackend->SetTextureSubImage(0, h, w, 1, &pixels[(h - 1) * w * 3]);
+        g_GfxBackend->SetTextureSubImage(0, texH - 1, w, 1, pixels);
+    }
+}
+
 void AnmManager::ApplySurfaceToColorBuffer(SDL_Surface *src, const SDL_Rect &srcRect, const SDL_Rect &dstRect)
 {
-    ZunViewport originalViewport;
-    ZunViewport fullscreenViewport;
-
     if (srcRect.w <= 0 || srcRect.h <= 0)
     {
         return;
     }
 
-    originalViewport.Get();
-
-    fullscreenViewport.x = 0;
-    fullscreenViewport.y = 0;
-    fullscreenViewport.height = GAME_WINDOW_HEIGHT;
-    fullscreenViewport.width = GAME_WINDOW_WIDTH;
-    fullscreenViewport.minZ = 0.0f;
-    fullscreenViewport.maxZ = 1.0f;
-
-    fullscreenViewport.Set();
+    // Full-screen viewport, widened over the pillarbox bars on a widescreen output
+    const i32 barWidth = this->BeginPillarboxPass();
 
     this->SetProjectionMode(PROJECTION_MODE_ORTHOGRAPHIC);
 
@@ -2175,15 +2235,25 @@ void AnmManager::ApplySurfaceToColorBuffer(SDL_Surface *src, const SDL_Rect &src
     u8 *surfaceData = ExtractSurfacePixels(src, 3);
 
     g_GfxBackend->SetTextureSubImage(0, 0, src->w, src->h, surfaceData);
+    PadTextureEdges(surfaceData, src->w, src->h, textureWidth, textureHeight);
 
     delete[] surfaceData;
 
+    // [vita] a background outpainted to the full screen width (see LoadSurface) covers the bars on its own
+    SDL_Rect dst = dstRect;
+    const bool isWide = barWidth > 0 && src->w == GAME_WINDOW_WIDTH + 2 * barWidth;
+    if (isWide)
+    {
+        dst.x -= barWidth;
+        dst.w = src->w;
+    }
+
     VertexTex1DiffuseXyz verts[4];
 
-    verts[0].position = ZunVec3(dstRect.x, dstRect.y, 0.0f);
-    verts[1].position = ZunVec3(dstRect.x + dstRect.w, dstRect.y, 0.0f);
-    verts[2].position = ZunVec3(dstRect.x, dstRect.y + dstRect.h, 0.0f);
-    verts[3].position = ZunVec3(dstRect.x + dstRect.w, dstRect.y + dstRect.h, 0.0f);
+    verts[0].position = ZunVec3(dst.x, dst.y, 0.0f);
+    verts[1].position = ZunVec3(dst.x + dst.w, dst.y, 0.0f);
+    verts[2].position = ZunVec3(dst.x, dst.y + dst.h, 0.0f);
+    verts[3].position = ZunVec3(dst.x + dst.w, dst.y + dst.h, 0.0f);
 
     verts[0].textureUV = ZunVec2(0.0f, 0.0f);
     verts[1].textureUV = ZunVec2(((f32)src->w) / textureWidth, 0.0f);
@@ -2203,6 +2273,24 @@ void AnmManager::ApplySurfaceToColorBuffer(SDL_Surface *src, const SDL_Rect &src
 
     this->BackendDrawCall();
 
+    if (barWidth > 0 && !isWide)
+    {
+        // Reflect the quad across the 4:3 area's left and right edges; only the strips inside the bars show
+        const f32 axes[2] = {0.0f, (f32)GAME_WINDOW_WIDTH};
+        for (f32 axis : axes)
+        {
+            VertexTex1DiffuseXyz mirrored[4];
+            for (i32 i = 0; i < 4; i++)
+            {
+                mirrored[i] = verts[i];
+                mirrored[i].position.x = 2.0f * axis - verts[i].position.x;
+            }
+            this->SetAttributePointer(VERTEX_ARRAY_POSITION, sizeof(*mirrored), &mirrored[0].position);
+            this->SetAttributePointer(VERTEX_ARRAY_TEX_COORD, sizeof(*mirrored), &mirrored[0].textureUV);
+            this->BackendDrawCall();
+        }
+    }
+
     this->SetColorOp(COMPONENT_ALPHA, COLOR_OP_MODULATE);
     this->SetColorOp(COMPONENT_RGB, COLOR_OP_MODULATE);
 
@@ -2212,5 +2300,5 @@ void AnmManager::ApplySurfaceToColorBuffer(SDL_Surface *src, const SDL_Rect &src
     this->SetCurrentTexture(0);
     this->SetCurrentBlendMode(0xff);
 
-    originalViewport.Set();
+    this->EndPillarboxPass();
 }

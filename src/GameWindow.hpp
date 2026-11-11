@@ -18,7 +18,7 @@
 #ifndef PLAT_VITA
 #define GAME_WINDOW_WIDTH_REAL (GAME_WINDOW_WIDTH)
 #else
-#define GAME_WINDOW_WIDTH_REAL (GAME_WINDOW_WIDTH)
+#define GAME_WINDOW_WIDTH_REAL (960)
 #endif
 #endif
 
@@ -26,7 +26,7 @@
 #ifndef PLAT_VITA
 #define GAME_WINDOW_HEIGHT_REAL (GAME_WINDOW_HEIGHT)
 #else
-#define GAME_WINDOW_HEIGHT_REAL (GAME_WINDOW_HEIGHT)
+#define GAME_WINDOW_HEIGHT_REAL (544)
 #endif
 #endif
 
@@ -35,13 +35,13 @@
 #ifndef PLAT_VITA
 #define VIEWPORT_OFF_X 0
 #else
-#define VIEWPORT_OFF_X 160
+#define VIEWPORT_OFF_X 0
 #endif
 #define VIEWPORT_HEIGHT GAME_WINDOW_HEIGHT_REAL
 #ifndef PLAT_VITA
 #define VIEWPORT_OFF_Y 0
 #else
-#define VIEWPORT_OFF_Y 32
+#define VIEWPORT_OFF_Y 0
 #endif
 
 // Aspect ratio wider than 4:3

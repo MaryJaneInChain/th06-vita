@@ -51,6 +51,13 @@ RenderResult GameWindow::Render()
         {
             if (g_Supervisor.RedrawWholeFrame())
             {
+#ifdef PLAT_VITA
+                // [vita] Every other clear is scissored to the 4:3 viewport, so blank the pillarbox bars here;
+                //   Gui::DrawGameScene paints the frame pattern into them during gameplay.
+                g_GfxBackend->SetViewport(0, 0, GAME_WINDOW_WIDTH_REAL, GAME_WINDOW_HEIGHT_REAL);
+                g_GfxBackend->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                g_GfxBackend->Clear(CLEAR_COLOR_BUFFER);
+#endif
                 viewport.x = 0;
                 viewport.y = 0;
                 viewport.width = GAME_WINDOW_WIDTH;

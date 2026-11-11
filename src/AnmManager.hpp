@@ -391,9 +391,17 @@ struct AnmManager
     void ReleaseSurfaces(void);
     ZunResult LoadSurface(i32 surfaceIdx, const char *path);
     void ReleaseSurface(i32 surfaceIdx);
+    // On a widescreen output these also fill the bars beside the 4:3 area: with an outpainted wide copy of the
+    //   image if LoadSurface found one, else with the image's edges mirrored outwards
     void CopySurfaceToBackBuffer(i32 surfaceIdx, i32 left, i32 top, i32 x, i32 y);
     void CopySurfaceRectToBackBuffer(i32 surfaceIdx, i32 rectX, i32 rectY, i32 rectLeft, i32 rectTop, i32 width,
                                      i32 height);
+
+    // Temporarily widen the viewport to the whole output, so 2D draws can reach the pillarbox bars beside the
+    //   4:3 area (game x from -barWidth to 640 + barWidth, same scale). Returns barWidth in game pixels, 0 when
+    //   the output is 4:3. Every Begin must be paired with an End.
+    i32 BeginPillarboxPass();
+    void EndPillarboxPass();
 
     void TranslateRotation(VertexTex1Xyzrhw *param_1, float x, float y, float sine, float cosine, float xOffset,
                            float yOffset);
@@ -422,7 +430,8 @@ struct AnmManager
         this->screenshotHeight = GAME_REGION_HEIGHT;
     }
 
-    static SDL_Surface *LoadToSurfaceWithFormat(const char *filename, SDL_PixelFormatEnum format, u8 **fileData);
+    static SDL_Surface *LoadToSurfaceWithFormat(const char *filename, SDL_PixelFormatEnum format, u8 **fileData,
+                                                int isExternalResource = 0);
     static u8 *ExtractSurfacePixels(SDL_Surface *src, u8 pixelDepth);
     static void FlipSurface(SDL_Surface *surface);
     void ApplySurfaceToColorBuffer(SDL_Surface *src, const SDL_Rect &srcRect, const SDL_Rect &dstRect);

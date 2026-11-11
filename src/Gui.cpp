@@ -1071,19 +1071,22 @@ void Gui::DrawGameScene()
     if (((g_Supervisor.cfg.opts >> GCOS_DISPLAY_MINIMUM_GRAPHICS) & 1) == 0 &&
         (vm->currentInstruction != NULL || g_Supervisor.unk198 != 0 || g_Supervisor.RedrawWholeFrame()))
     {
-        for (yPos = 0.0f; yPos < 464.0f; yPos += 32.0f)
+        // Tile the frame pattern over the whole output width, so on a widescreen output it also fills the
+        //   pillarbox bars. With no bars this is exactly the original left column + right panel.
+        const i32 barWidth = g_AnmManager->BeginPillarboxPass();
+        for (xPos = -32.0f * ((barWidth + 31) / 32); xPos < GAME_WINDOW_WIDTH + barWidth; xPos += 32.0f)
         {
-            vm->pos = ZunVec3(0.0f, yPos, 0.49f);
-            g_AnmManager->DrawNoRotation(vm);
-        }
-        for (xPos = 416.0f; xPos < 624.0f; xPos += 32.0f)
-        {
+            if (xPos >= GAME_REGION_LEFT && xPos < GAME_REGION_LEFT + GAME_REGION_WIDTH)
+            {
+                continue;
+            }
             for (yPos = 0.0f; yPos < 464.0f; yPos += 32.0f)
             {
                 vm->pos = ZunVec3(xPos, yPos, 0.49f);
                 g_AnmManager->DrawNoRotation(vm);
             }
         }
+        g_AnmManager->EndPillarboxPass();
         vm = &this->impl->vms[7];
         for (xPos = 32.0f; xPos < 416.0f; xPos += 32.0f)
         {
