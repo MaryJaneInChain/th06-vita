@@ -3,7 +3,7 @@
 This is a port of Touhou Koumakyou ~ the Embodiment of Scarlet Devil (東方紅魔郷　～ the Embodiment of Scarlet Devil) to the Playstation Vita using [GensokyoClub's portable EoSD decompilation](https://github.com/GensokyoClub/th06/tree/portable).
 
 ## Installation
-You must own a legally obtained install of EoSD (v1.02h) as well as access to msgothic.ttc from your Windows install (or any other compatible font). From there:
+You must own a legally obtained install of EoSD (v1.02h). A VPK reads one edition of the game data, chosen when it is built (`TH06_LANG`, see [Building](#building)): the Chinese (汉化) patch (`ZH`, the default), the original Japanese release (`JP`), or English data files (`EN`). From there:
 
  1. Download the latest VPK from the releases tab.
  2. Copy the VPK to somewhere convenient on your Vita so you can install it.
@@ -12,15 +12,20 @@ You must own a legally obtained install of EoSD (v1.02h) as well as access to ms
 ```
 bgm/
 紅魔郷CM.DAT
-紅魔郷CD.DAT
+紅魔郷ED.DAT
 紅魔郷IN.DAT
 紅魔郷MD.DAT
 紅魔郷ST.DAT
 紅魔郷TL.DAT
 ```
-5. Copy msgothic.ttc to the `th06` folder you just made on your Vita.
-6. (On your Vita) Install the VPK.
-7. Enjoy!
+   English data uses `KOUMAKYO_CM.dat` … `KOUMAKYO_TL.dat` instead of the `紅魔郷*.DAT` files.
+
+5. Copy a font to the `th06` folder as `msgothic.ttc`:
+   - Japanese / English: msgothic.ttc from your Windows install (or any other compatible font).
+   - Chinese: SimSun (`simsun.ttc`), renamed to `msgothic.ttc`. The 汉化 exe draws its text with SimSun's 16px bitmaps.
+6. Optional, widescreen backgrounds: 848x480 JPGs named like the game's own backgrounds (`title00.jpg`, `select00.jpg`, `end00.jpg`, …) in `th06/wide/` are drawn across the whole screen. Without them the edges of the 640x480 backgrounds are mirrored into the side bars.
+7. (On your Vita) Install the VPK.
+8. Enjoy!
 
 ## Known Issues
 
@@ -39,7 +44,7 @@ git clone https://github.com/Wavy667/th06-vita.git
 cd th06-vita
 mkdir build
 cd build
-cmake ..
+cmake .. -DTH06_LANG=ZH    # ZH: Chinese (汉化) data, JP: original Japanese, EN: English data
 make
 ```
 ## Special Thanks

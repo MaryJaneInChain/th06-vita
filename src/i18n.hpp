@@ -1,6 +1,9 @@
 #pragma once
 
+// String table, TH_JP or TH_EN; set from CMake's TH06_LANG. The Chinese data (TH_GBK) uses TH_JP.
+#ifndef TH_LANG
 #define TH_LANG TH_JP
+#endif
 
 // JP
 #ifndef PLAT_VITA
@@ -116,7 +119,11 @@
 #endif
 
 // EN
+#ifndef PLAT_VITA
 #define TH_EN_CONFIG_FILE "th06.cfg"
+#else
+#define TH_EN_CONFIG_FILE "ux0:data/th06/th06.cfg"
+#endif
 #define TH_EN_WINDOW_TITLE "Touhou Koumakyou ~ the Embodiment of Scarlet Devil"
 #define TH_EN_DBG_MAINMENU_VRAM "Debug : title menu VRAM = %d\n"
 #define TH_EN_DBG_RESULTSCREEN_COUNAT "counat = %d\n"
@@ -206,12 +213,21 @@
 
 #define TH_EN_UNKNOWN_SPELLCARD "??????"
 
+#ifndef PLAT_VITA
 #define TH_EN_CM_DAT_FILE "KOUMAKYO_CM.dat"
 #define TH_EN_ED_DAT_FILE "KOUMAKYO_ED.dat"
 #define TH_EN_IN_DAT_FILE "KOUMAKYO_IN.dat"
 #define TH_EN_MD_DAT_FILE "KOUMAKYO_MD.dat"
 #define TH_EN_ST_DAT_FILE "KOUMAKYO_ST.dat"
 #define TH_EN_TL_DAT_FILE "KOUMAKYO_TL.dat"
+#else
+#define TH_EN_CM_DAT_FILE "ux0:data/th06/KOUMAKYO_CM.dat"
+#define TH_EN_ED_DAT_FILE "ux0:data/th06/KOUMAKYO_ED.dat"
+#define TH_EN_IN_DAT_FILE "ux0:data/th06/KOUMAKYO_IN.dat"
+#define TH_EN_MD_DAT_FILE "ux0:data/th06/KOUMAKYO_MD.dat"
+#define TH_EN_ST_DAT_FILE "ux0:data/th06/KOUMAKYO_ST.dat"
+#define TH_EN_TL_DAT_FILE "ux0:data/th06/KOUMAKYO_TL.dat"
+#endif
 #define TH_CONCAT_HELPER(x, y) x##y
 
 #define TH_MAKE_LANG_STR(lang, id) TH_CONCAT_HELPER(lang, id)

@@ -49,10 +49,18 @@ include_directories(
 )
 
 add_compile_definitions(PLAT_VITA)
-# Chinese (汉化) data: text in the DAT files is GBK. -DTH06_GBK=OFF for the original Japanese data.
-option(TH06_GBK "Decode data-file text as GBK" ON)
-if(TH06_GBK)
+# Which edition of the game data this build reads (-DTH06_LANG=...):
+#   ZH  the Chinese (汉化) patch: Japanese file names, GBK text
+#   JP  the original Japanese release
+#   EN  English data files (KOUMAKYO_*.dat)
+set(TH06_LANG "ZH" CACHE STRING "Game data edition: ZH, JP or EN")
+set_property(CACHE TH06_LANG PROPERTY STRINGS ZH JP EN)
+if(TH06_LANG STREQUAL "ZH")
   add_compile_definitions(TH_GBK)
+elseif(TH06_LANG STREQUAL "EN")
+  add_compile_definitions(TH_LANG=TH_EN)
+elseif(NOT TH06_LANG STREQUAL "JP")
+  message(FATAL_ERROR "TH06_LANG must be ZH, JP or EN, not '${TH06_LANG}'")
 endif()
 
 add_executable(${PROJECT_NAME}
