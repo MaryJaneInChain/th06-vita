@@ -1,5 +1,7 @@
 # Touhou 6 (EoSD) Vita Port
 
+English | [简体中文](README.zh-CN.md)
+
 This is a port of Touhou Koumakyou ~ the Embodiment of Scarlet Devil (東方紅魔郷　～ the Embodiment of Scarlet Devil) to the Playstation Vita using [GensokyoClub's portable EoSD decompilation](https://github.com/GensokyoClub/th06/tree/portable).
 
 This fork adds support for the Chinese (汉化) patch, along with a few other changes:
