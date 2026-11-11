@@ -14,6 +14,22 @@
 #include "i18n.hpp"
 #include "utils.hpp"
 
+#ifdef PLAT_VITA
+// [vita] The SDK's vitaGL is built with its boot splash (a vitaGL logo started from vglInit). Defining every symbol
+//   the rest of vitaGL takes from its splashscreen.o keeps that object, and so the splash, out of the link.
+extern "C"
+{
+    unsigned char is_splashscreen_active = 0;
+    int splash_mutex[2]; // two semaphore ids, only used while the splash is active
+    void invoke_splashscreen(void)
+    {
+    }
+    void clear_splashscreen(void)
+    {
+    }
+}
+#endif
+
 int main(int argc, char *argv[])
 {
     (void)argc;
