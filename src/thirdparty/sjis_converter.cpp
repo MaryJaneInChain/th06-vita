@@ -62,3 +62,54 @@ char *sjis2utf8(const char *input)
     output[indexOutput] = '\0';
     return output;
 }
+
+#include "gbk_conv_table.h"
+
+// Chinese (汉化) data files store their text as GBK instead of Shift-JIS.
+char *gbk2utf8(const char *input)
+{
+    const uint8_t *in = (const uint8_t *)input;
+    char *output = (char *)malloc(3 * strlen(input) + 1);
+    int o = 0;
+
+    while (*in)
+    {
+        uint16_t u;
+        if (*in < 0x80)
+        {
+            u = *in++;
+        }
+        else if (*in >= 0x81 && *in <= 0xFE && in[1] >= 0x40 && in[1] <= 0xFE)
+        {
+            // ponytail: 0x81F4 is SJIS ♪ (TH_SONG_NAME prefix); it shadows the rare GBK char 侓
+            u = (in[0] == 0x81 && in[1] == 0xF4) ? 0x266A : gbk_convTable[(in[0] - 0x81) * 191 + (in[1] - 0x40)];
+            in += 2;
+            if (u == 0)
+                u = '?';
+        }
+        else
+        {
+            u = '?';
+            in++;
+        }
+
+        if (u < 0x80)
+        {
+            output[o++] = u;
+        }
+        else if (u < 0x800)
+        {
+            output[o++] = 0xC0 | (u >> 6);
+            output[o++] = 0x80 | (u & 0x3f);
+        }
+        else
+        {
+            output[o++] = 0xE0 | (u >> 12);
+            output[o++] = 0x80 | ((u >> 6) & 0x3f);
+            output[o++] = 0x80 | (u & 0x3f);
+        }
+    }
+
+    output[o] = '\0';
+    return output;
+}

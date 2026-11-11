@@ -49,6 +49,11 @@ include_directories(
 )
 
 add_compile_definitions(PLAT_VITA)
+# Chinese (汉化) data: text in the DAT files is GBK. -DTH06_GBK=OFF for the original Japanese data.
+option(TH06_GBK "Decode data-file text as GBK" ON)
+if(TH06_GBK)
+  add_compile_definitions(TH_GBK)
+endif()
 
 add_executable(${PROJECT_NAME}
     "src/AnmManager.cpp"

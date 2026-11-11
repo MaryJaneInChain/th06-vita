@@ -46,6 +46,10 @@ ZunResult TextHelper::CreateTextBuffer()
         return ZUN_ERROR;
     }
 
+#ifdef TH_GBK
+    TTF_SetFontStyle(g_Font, TTF_STYLE_BOLD);
+#endif
+
     g_TextBufferSurface =
         SDL_CreateRGBSurfaceWithFormat(0, GAME_WINDOW_WIDTH, TEXT_BUFFER_HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
 
@@ -192,6 +196,75 @@ void SurfaceOverwriteBlend(SDL_Surface *srcSurface, SDL_Surface *dstSurface, u32
     SDL_UnlockSurface(srcSurface);
 }
 
+#ifdef TH_GBK
+static SDL_Surface *RenderSolidArgb(const char *text, ZunColor color)
+{
+    SDL_Color c = {(u8)(color & 0xFF), (u8)((color >> 8) & 0xFF), (u8)((color >> 16) & 0xFF), 0xFF};
+    SDL_Surface *mono = TTF_RenderUTF8_Solid(g_Font, text, c);
+    if (mono == NULL)
+        return NULL;
+    // colorkeyed 8-bit -> ARGB8888 with alpha 0 for the background
+    SDL_Surface *argb = SDL_ConvertSurfaceFormat(mono, SDL_PIXELFORMAT_ARGB8888, 0);
+    SDL_FreeSurface(mono);
+    return argb;
+}
+
+// The 汉化 exe draws text with GDI "System" + GB2312_CHARSET, 16px bold, straight into the texture (no 2x
+//   supersampling). On Chinese Windows those glyphs come from SimSun's embedded 16px bitmaps, so this wants
+//   simsun.ttc installed as msgothic.ttc and renders it unsmoothed at 1:1.
+static void RenderTextGbk(i32 xPos, i32 yPos, i32 spriteWidth, ZunColor textColor, ZunColor shadowColor,
+                          const char *text, TextureData *outTexture)
+{
+    const i32 lineHeight = 16;
+    SDL_Rect clearRect = {0, 0, spriteWidth + 2, lineHeight + 2};
+    SDL_FillRect(g_TextBufferSurface, &clearRect, 0);
+
+    TTF_SetFontSize(g_Font, lineHeight);
+
+    if (shadowColor != COLOR_WHITE)
+    {
+        SDL_Surface *shadow = RenderSolidArgb(text, shadowColor);
+        if (shadow != NULL)
+        {
+            SDL_Rect shadowRect = {xPos + 1, 1, shadow->w, shadow->h};
+            SDL_SetSurfaceBlendMode(shadow, SDL_BLENDMODE_NONE);
+            SDL_BlitSurface(shadow, NULL, g_TextBufferSurface, &shadowRect);
+            SDL_FreeSurface(shadow);
+        }
+    }
+
+    SDL_Surface *regular = RenderSolidArgb(text, textColor);
+    if (regular != NULL)
+    {
+        SurfaceOverwriteBlend(regular, g_TextBufferSurface, xPos);
+        SDL_FreeSurface(regular);
+    }
+
+    if (!outTexture->textureData || outTexture->format != TEX_FMT_A8R8G8B8)
+    {
+        free(outTexture->textureData);
+        outTexture->textureData = (u8 *)malloc(outTexture->width * outTexture->height * 4);
+        memset(outTexture->textureData, 0, outTexture->width * outTexture->height * 4);
+    }
+    outTexture->format = TEX_FMT_A8R8G8B8;
+    SDL_Surface *textureSurface = SDL_CreateRGBSurfaceWithFormatFrom(
+        outTexture->textureData, outTexture->width, outTexture->height, SDL_BITSPERPIXEL(SDL_PIXELFORMAT_RGBA32),
+        outTexture->width * SDL_BYTESPERPIXEL(SDL_PIXELFORMAT_RGBA32), SDL_PIXELFORMAT_RGBA32);
+
+    // same buffer coverage (and so the same top-to-bottom gradient) as the 2x path's InvertAlpha call
+    TextHelper::InvertAlpha(0, 0, spriteWidth, lineHeight * 2 + 6);
+
+    SDL_Rect src = {0, 0, spriteWidth, lineHeight};
+    SDL_Rect dst = {0, yPos, spriteWidth, lineHeight};
+    SDL_BlitSurface(g_TextBufferSurface, &src, textureSurface, &dst);
+
+    g_AnmManager->SetCurrentTexture(outTexture->handle);
+    g_GfxBackend->SetTextureImage(outTexture->width, outTexture->height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                  outTexture->textureData);
+    SDL_FreeSurface(textureSurface);
+}
+#endif
+
 void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 spriteHeight, i32 fontHeight,
                                      i32 fontWidth, ZunColor textColor, ZunColor shadowColor, const char *string,
                                      TextureData *outTexture)
@@ -204,7 +277,11 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
 
     if (!isUTF8Encoded(string))
     {
+#ifdef TH_GBK
+        char *utf8 = gbk2utf8(string);
+#else
         char *utf8 = sjis2utf8(string);
+#endif
         strcpy(convertedText, utf8);
         free(utf8);
     }
@@ -212,6 +289,11 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
     {
         strcpy(convertedText, string);
     }
+
+#ifdef TH_GBK
+    RenderTextGbk(xPos, yPos, spriteWidth, textColor, shadowColor, convertedText, outTexture);
+    return;
+#endif
 
     TTF_SetFontSize(g_Font, fontHeight * 2);
 
