@@ -210,8 +210,8 @@ static SDL_Surface *RenderSolidArgb(const char *text, ZunColor color)
 }
 
 // The 汉化 exe draws text with GDI "System" + GB2312_CHARSET, 16px bold, straight into the texture (no 2x
-//   supersampling). On Chinese Windows those glyphs come from SimSun's embedded 16px bitmaps, so this wants
-//   simsun.ttc installed as msgothic.ttc and renders it unsmoothed at 1:1.
+//   supersampling). On Chinese Windows those glyphs come from SimSun's embedded 16px bitmaps, so this loads
+//   simsun.ttc (TH_PRIMARY_FONT_FILENAME) and renders it unsmoothed at 1:1.
 static void RenderTextGbk(i32 xPos, i32 yPos, i32 spriteWidth, ZunColor textColor, ZunColor shadowColor,
                           const char *text, TextureData *outTexture)
 {

@@ -343,9 +343,16 @@
 #define TH_FONT_NAME "ＭＳ ゴシック"
 
 #ifndef PLAT_VITA
-#define TH_PRIMARY_FONT_FILENAME "msgothic.ttc"
-#define TH_FALLBACK_FONT_FILENAME "NotoSansJP-Regular.ttf"
+#define TH_FONT_DIR ""
 #else
-#define TH_PRIMARY_FONT_FILENAME "ux0:data/th06/msgothic.ttc"
-#define TH_FALLBACK_FONT_FILENAME "ux0:data/th06/NotoSansJP-Regular.ttf"
+#define TH_FONT_DIR "ux0:data/th06/"
+#endif
+#ifdef TH_GBK
+// The 汉化 exe asks GDI for "System" + GB2312, i.e. SimSun's bitmaps on Chinese Windows. MS Gothic lacks most
+//   simplified characters; msgothic.ttc is only the fallback name for installs that put SimSun there.
+#define TH_PRIMARY_FONT_FILENAME TH_FONT_DIR "simsun.ttc"
+#define TH_FALLBACK_FONT_FILENAME TH_FONT_DIR "msgothic.ttc"
+#else
+#define TH_PRIMARY_FONT_FILENAME TH_FONT_DIR "msgothic.ttc"
+#define TH_FALLBACK_FONT_FILENAME TH_FONT_DIR "NotoSansJP-Regular.ttf"
 #endif
