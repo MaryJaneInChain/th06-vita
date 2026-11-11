@@ -25,6 +25,13 @@
 #include <cstring>
 #include <ctime>
 
+// Default config picks WAV music only if this file exists (PlayAudio prefixes ux0:data/th06/ on Vita too).
+#ifdef PLAT_VITA
+#define TH_WAV_CHECK_FILE "ux0:data/th06/bgm/th06_01.wav"
+#else
+#define TH_WAV_CHECK_FILE "bgm/th06_01.wav"
+#endif
+
 Supervisor g_Supervisor;
 ControllerMapping g_ControllerMapping = {
     (i16)SDL_CONTROLLER_BUTTON_A,
@@ -558,7 +565,11 @@ void Supervisor::DrawFpsCounter()
                 g_Supervisor.unk1b4 = framerate * .5f + g_Supervisor.unk1b4;
         }
     }
+#ifndef PLAT_VITA // [vita] counter hidden; the slowdown stats above still feed the result screen
     if (!g_Supervisor.isInEnding)
+#else
+    if (false)
+#endif
     {
         fpsCounterPos.x = 512.0;
         fpsCounterPos.y = 464.0;
@@ -657,7 +668,7 @@ ZunResult Supervisor::LoadConfig(const char *path)
         g_Supervisor.cfg.version = GAME_VERSION;
         g_Supervisor.cfg.padXAxis = 600;
         g_Supervisor.cfg.padYAxis = 600;
-        wavFile = FileSystem::FopenUTF8("bgm/th06_01.wav", "rb");
+        wavFile = FileSystem::FopenUTF8(TH_WAV_CHECK_FILE, "rb");
         if (wavFile != NULL)
         {
             g_Supervisor.cfg.musicMode = WAV;
@@ -690,7 +701,7 @@ ZunResult Supervisor::LoadConfig(const char *path)
             g_Supervisor.cfg.version = GAME_VERSION;
             g_Supervisor.cfg.padXAxis = 600;
             g_Supervisor.cfg.padYAxis = 600;
-            wavFile2 = FileSystem::FopenUTF8("bgm/th06_01.wav", "rb");
+            wavFile2 = FileSystem::FopenUTF8(TH_WAV_CHECK_FILE, "rb");
             if (wavFile2 != NULL)
             {
                 g_Supervisor.cfg.musicMode = WAV;
@@ -712,6 +723,10 @@ ZunResult Supervisor::LoadConfig(const char *path)
         }
         g_ControllerMapping = g_Supervisor.cfg.controllerMapping;
         free((void *)data);
+    }
+    if (this->cfg.musicMode > TH_LAST_MUSIC_MODE)
+    {
+        this->cfg.musicMode = WAV;
     }
     if (((this->cfg.opts >> GCOS_DONT_USE_VERTEX_BUF) & 1) != 0)
     {

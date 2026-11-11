@@ -49,6 +49,13 @@ enum MusicMode
     MIDI = 2
 };
 
+// Last selectable music mode. The Vita build has no MIDI output, so MIDI there would just be silence.
+#ifdef PLAT_VITA
+#define TH_LAST_MUSIC_MODE WAV
+#else
+#define TH_LAST_MUSIC_MODE MIDI
+#endif
+
 struct GameConfiguration
 {
     ControllerMapping controllerMapping;

@@ -1730,7 +1730,7 @@ u32 MainMenu::OnUpdateOptionsMenu()
                 g_Supervisor.StopAudio();
                 if (g_Supervisor.cfg.musicMode <= OFF)
                 {
-                    g_Supervisor.cfg.musicMode = MIDI + 1;
+                    g_Supervisor.cfg.musicMode = TH_LAST_MUSIC_MODE + 1;
                 }
                 g_Supervisor.cfg.musicMode -= 1;
                 g_Supervisor.PlayAudio("bgm/th06_01.mid");
@@ -1798,7 +1798,7 @@ u32 MainMenu::OnUpdateOptionsMenu()
                 g_SoundPlayer.PlaySoundByIdx(SOUND_MOVE_MENU);
                 g_Supervisor.StopAudio();
                 g_Supervisor.cfg.musicMode += 1;
-                if (g_Supervisor.cfg.musicMode >= MIDI + 1)
+                if (g_Supervisor.cfg.musicMode >= TH_LAST_MUSIC_MODE + 1)
                 {
                     g_Supervisor.cfg.musicMode = OFF;
                 }
