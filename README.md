@@ -2,10 +2,17 @@
 
 This is a port of Touhou Koumakyou ~ the Embodiment of Scarlet Devil (東方紅魔郷　～ the Embodiment of Scarlet Devil) to the Playstation Vita using [GensokyoClub's portable EoSD decompilation](https://github.com/GensokyoClub/th06/tree/portable).
 
-## Installation
-You must own a legally obtained install of EoSD (v1.02h). A VPK reads one edition of the game data, chosen when it is built (`TH06_LANG`, see [Building](#building)): the Chinese (汉化) patch (`ZH`, the default), the original Japanese release (`JP`), or English data files (`EN`). From there:
+This fork adds support for the Chinese (汉化) patch, along with a few other changes:
+ - Text from the Chinese patch shows up properly, in the same SimSun bitmap font the patched game uses on Windows
+ - The game fills the whole screen (960x544) instead of a 640x480 box in the middle. The bars on the sides are filled in, and the title, menu and ending backgrounds are widened to 16:9
+ - Music defaults to WAV, since MIDI doesn't make any sound on the Vita
+ - No FPS counter, and no vitaGL logo when it boots
+ - The original Japanese release and English data still work, you just pick which one when building
 
- 1. Download the latest VPK from the releases tab.
+## Installation
+You must own a legally obtained install of EoSD (v1.02h), as well as a font from your Windows install (see step 5). From there:
+
+ 1. Build the VPK (see [Building](#building)). This fork doesn't have any releases yet.
  2. Copy the VPK to somewhere convenient on your Vita so you can install it.
  3. Create a `th06` folder in your `data` folder on your Vita.
  4. Copy the following files and folders from your EoSD install directory to the `th06` folder you just made on your Vita:
@@ -18,14 +25,15 @@ bgm/
 紅魔郷ST.DAT
 紅魔郷TL.DAT
 ```
-   English data uses `KOUMAKYO_CM.dat` … `KOUMAKYO_TL.dat` instead of the `紅魔郷*.DAT` files.
+   If you're using English data, copy the `KOUMAKYO_*.dat` files instead.
 
-5. Copy a font to the `th06` folder as `msgothic.ttc`:
-   - Japanese / English: msgothic.ttc from your Windows install (or any other compatible font).
-   - Chinese: SimSun (`simsun.ttc`), renamed to `msgothic.ttc`. The 汉化 exe draws its text with SimSun's 16px bitmaps.
-6. Optional, widescreen backgrounds: 848x480 JPGs named like the game's own backgrounds (`title00.jpg`, `select00.jpg`, `end00.jpg`, …) in `th06/wide/` are drawn across the whole screen. Without them the edges of the 640x480 backgrounds are mirrored into the side bars.
-7. (On your Vita) Install the VPK.
-8. Enjoy!
+5. Copy a font to the `th06` folder you just made on your Vita:
+   - Chinese: `simsun.ttc` (SimSun). That's what the Chinese patch draws its text with, and MS Gothic is missing most simplified Chinese characters.
+   - Japanese / English: `msgothic.ttc` (or any other compatible font).
+6. (On your Vita) Install the VPK.
+7. Enjoy!
+
+The widened backgrounds don't contain any of the game's own images. The VPK only has the extra bits for the left and right (outpainted with an image model), and the game puts your own copy of each background in the middle when it loads it. Those bits were made to match the Chinese patch's backgrounds, so if you're using other data, a background the patch changed might not line up perfectly.
 
 ## Known Issues
 
@@ -33,21 +41,29 @@ bgm/
  - Some minor graphical bugs
 	 - The blurred game window on a pause is offset vertically
 	 - Remilia's spell card background has a light blue tint that isn't meant to be there
+ - With the Chinese patch, a few names are written into the game itself rather than the data files, so they still show up in Japanese
+ - The Japanese and English builds of this fork haven't been tested on a real Vita yet
 
 If you run into any other problems with this port, open an issue!
 
 ## Building
-Alongside VitaSDK, you must have [VitaGL](https://github.com/Rinnegatamante/vitaGL/) and [Northfear's SDL2](https://github.com/Northfear/SDL) fork compiled and installed.
-You can then build by running the following in your terminal:
+The easiest way to build is with the VitaSDK container image, which already has VitaGL and SDL2 set up. Run the following in your terminal (`docker` works the same as `podman`):
 ```
-git clone https://github.com/Wavy667/th06-vita.git
+git clone -b vita-chinese-widescreen https://github.com/MaryJaneInChain/th06-vita.git
 cd th06-vita
-mkdir build
-cd build
-cmake .. -DTH06_LANG=ZH    # ZH: Chinese (汉化) data, JP: original Japanese, EN: English data
-make
+podman run --rm -v "$PWD":/work -w /work docker.io/vitasdk/vitasdk:2026.08 \
+  sh -c 'cmake -S . -B build && cmake --build build'
 ```
+The VPK ends up at `build/th06-vita.vpk`. As long as you use that exact image (`2026.08`), you get the exact same VPK, byte for byte, no matter where you cloned it.
+
+By default the VPK is for the Chinese patch. For the original Japanese release or English data, add `-DTH06_LANG=JP` or `-DTH06_LANG=EN` to the first `cmake`.
+
+If you'd rather not use the container: alongside VitaSDK, you must have [VitaGL](https://github.com/Rinnegatamante/vitaGL/) and [Northfear's SDL2](https://github.com/Northfear/SDL) fork compiled and installed, as well as Python 3.
+
+You don't need anything extra for the widened backgrounds, since the side bits are already in the repo (`resources/vita/wide`). If you want to remake them, the tools are in `tools/widescreen` (see the top of `widescreen.py`).
+
 ## Special Thanks
+- [Wavy667](https://github.com/Wavy667) for the [Vita port](https://github.com/Wavy667/th06-vita) this fork is built on
 - [GensokyoClub](https://github.com/GensokyoClub) for their [EoSD decompilation](https://github.com/GensokyoClub/th06)
 - [Swiizyu](https://github.com/Swiizyu) for their [Switch port](https://github.com/Swiizyu/th06-switch) and solution to fix elements rendering offscreen
 - ZUN for making Touhou!

@@ -1865,6 +1865,74 @@ void AnmManager::DrawStringFormat2(AnmVm *vm, ZunColor textColor, ZunColor shado
     return;
 }
 
+// Width in game pixels of each pillarbox bar beside the 4:3 area, 0 on a 4:3 output
+static i32 PillarboxBarWidth()
+{
+    return (i32)std::ceil(VIEWPORT_OFF_X / WIDTH_RESOLUTION_SCALE);
+}
+
+#ifdef PLAT_VITA
+// [vita] Widescreen backgrounds. app0:wide/<name>.png (resources/vita/wide, made by tools/widescreen) holds only the
+//   outpainted parts of a background widened by one bar on each side: wide-image columns [0, bar + feather) and
+//   [bar + width - feather, width + 2 * bar), side by side, none of them original pixels. The original from the
+//   player's data files goes in the middle, blended into the strips over the feather columns. Returns the wide
+//   surface, or `image` itself when there is no strip file that fits.
+static SDL_Surface *WidenWithOutpaintedStrips(SDL_Surface *image, const char *path)
+{
+    const i32 feather = 6;
+    const i32 bar = PillarboxBarWidth();
+    const char *name = std::strrchr(path, '/');
+    name = name != NULL ? name + 1 : path;
+    char stripPath[128];
+    std::snprintf(stripPath, sizeof(stripPath), "app0:wide/%.*s.png", (int)std::strcspn(name, "."), name);
+
+    SDL_Surface *strips = AnmManager::LoadToSurfaceWithFormat(stripPath, SDL_PIXELFORMAT_RGB24, NULL, 1);
+    if (strips == NULL)
+    {
+        return image;
+    }
+    const i32 w = image->w;
+    const i32 h = image->h;
+    const i32 side = bar + feather;
+    SDL_Surface *wide = NULL;
+    if (bar > 0 && strips->w == 2 * side && strips->h == h)
+    {
+        wide = SDL_CreateRGBSurfaceWithFormat(0, w + 2 * bar, h, 24, SDL_PIXELFORMAT_RGB24);
+    }
+    if (wide == NULL)
+    {
+        SDL_FreeSurface(strips);
+        return image;
+    }
+
+    for (i32 y = 0; y < h; y++)
+    {
+        const u8 *s = (const u8 *)strips->pixels + y * strips->pitch;
+        const u8 *o = (const u8 *)image->pixels + y * image->pitch;
+        u8 *d = (u8 *)wide->pixels + y * wide->pitch;
+        std::memcpy(d, s, bar * 3);
+        std::memcpy(d + bar * 3, o, w * 3);
+        std::memcpy(d + (bar + w) * 3, s + (side + feather) * 3, bar * 3);
+        for (i32 i = 0; i < feather; i++)
+        {
+            // Original weight (i + 1) / (feather + 1), growing inwards from each seam
+            const i32 a = i + 1;
+            const i32 b = feather + 1 - a;
+            const i32 x = w - 1 - i;
+            for (i32 c = 0; c < 3; c++)
+            {
+                d[(bar + i) * 3 + c] = (a * o[i * 3 + c] + b * s[(bar + i) * 3 + c] + (feather + 1) / 2) / (feather + 1);
+                d[(bar + x) * 3 + c] =
+                    (a * o[x * 3 + c] + b * s[(side + feather - 1 - i) * 3 + c] + (feather + 1) / 2) / (feather + 1);
+            }
+        }
+    }
+    SDL_FreeSurface(strips);
+    SDL_FreeSurface(image);
+    return wide;
+}
+#endif
+
 ZunResult AnmManager::LoadSurface(i32 surfaceIdx, const char *path)
 {
     if (this->surfaces[surfaceIdx] != NULL)
@@ -1872,20 +1940,16 @@ ZunResult AnmManager::LoadSurface(i32 surfaceIdx, const char *path)
         this->ReleaseSurface(surfaceIdx);
     }
 
-#ifdef PLAT_VITA
-    // [vita] prefer an outpainted copy that also covers the pillarbox bars (see ApplySurfaceToColorBuffer)
-    char widePath[128];
-    const char *name = std::strrchr(path, '/');
-    std::snprintf(widePath, sizeof(widePath), "ux0:data/th06/wide/%s", name != NULL ? name + 1 : path);
-    this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(widePath, SDL_PIXELFORMAT_RGB24, NULL, 1);
-    if (this->surfaces[surfaceIdx] == NULL)
-#endif
-        this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(path, SDL_PIXELFORMAT_RGB24, NULL);
+    this->surfaces[surfaceIdx] = LoadToSurfaceWithFormat(path, SDL_PIXELFORMAT_RGB24, NULL);
 
     if (this->surfaces[surfaceIdx] == NULL)
     {
         return ZUN_ERROR;
     }
+
+#ifdef PLAT_VITA
+    this->surfaces[surfaceIdx] = WidenWithOutpaintedStrips(this->surfaces[surfaceIdx], path);
+#endif
 
     return ZUN_SUCCESS;
 
@@ -2164,7 +2228,7 @@ i32 AnmManager::BeginPillarboxPass()
     //   sprites queued under the old viewport). g_Supervisor.viewport doubles as DrawOrthographic's culling bounds.
     this->SetProjectionMode(PROJECTION_MODE_PERSPECTIVE);
 
-    const i32 barWidth = (i32)std::ceil(VIEWPORT_OFF_X / WIDTH_RESOLUTION_SCALE);
+    const i32 barWidth = PillarboxBarWidth();
     g_Supervisor.viewport.x = -barWidth;
     g_Supervisor.viewport.y = 0;
     g_Supervisor.viewport.width = GAME_WINDOW_WIDTH + 2 * barWidth;

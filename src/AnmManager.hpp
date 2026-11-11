@@ -391,8 +391,8 @@ struct AnmManager
     void ReleaseSurfaces(void);
     ZunResult LoadSurface(i32 surfaceIdx, const char *path);
     void ReleaseSurface(i32 surfaceIdx);
-    // On a widescreen output these also fill the bars beside the 4:3 area: with an outpainted wide copy of the
-    //   image if LoadSurface found one, else with the image's edges mirrored outwards
+    // On a widescreen output these also fill the bars beside the 4:3 area: with the outpainted strips LoadSurface
+    //   added to the image if it has them, else with the image's edges mirrored outwards
     void CopySurfaceToBackBuffer(i32 surfaceIdx, i32 left, i32 top, i32 x, i32 y);
     void CopySurfaceRectToBackBuffer(i32 surfaceIdx, i32 rectX, i32 rectY, i32 rectLeft, i32 rectTop, i32 width,
                                      i32 height);
