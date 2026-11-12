@@ -186,6 +186,26 @@ foreach(strip ${wide_strips})
   list(APPEND wide_files FILE "${strip}" "wide/${strip_name}")
 endforeach()
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Boot image (sce_sys/pic0.png): the loading screen widened the same way, made from the player's own
+#   紅魔郷IN.DAT when -DTH06_DATA_DIR=<game folder> is given; without it the VPK has no boot image
+set(TH06_DATA_DIR "" CACHE PATH "Game folder to make the boot image from (optional)")
+set(pic0_files)
+if(TH06_DATA_DIR)
+  file(GLOB in_archive "${TH06_DATA_DIR}/紅魔郷IN.DAT" "${TH06_DATA_DIR}/KOUMAKYO_IN.dat")
+  if(NOT in_archive)
+    message(FATAL_ERROR "TH06_DATA_DIR: no 紅魔郷IN.DAT or KOUMAKYO_IN.dat in ${TH06_DATA_DIR}")
+  endif()
+  set(pic0 "${CMAKE_CURRENT_BINARY_DIR}/pic0.png")
+  add_custom_command(OUTPUT "${pic0}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/widescreen/pic0.py"
+      "${TH06_DATA_DIR}" "${CMAKE_SOURCE_DIR}/resources/vita/wide/th06logo.png" "${pic0}"
+    DEPENDS ${in_archive} tools/widescreen/pic0.py tools/widescreen/pbg3.py resources/vita/wide/th06logo.png
+    VERBATIM)
+  set(pic0_files FILE "${pic0}" sce_sys/pic0.png)
+endif()
+
 # The FILE directive lets you add additional files to the VPK, the syntax is
 # FILE src_path dst_path_in_vpk. In this case, we add the LiveArea paths.
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
@@ -196,10 +216,10 @@ vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   FILE resources/vita/sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE resources/vita/sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
   ${wide_files}
+  ${pic0_files}
 )
 
 # Fixed zip timestamps, so the VPK depends only on what goes into it
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk.out" APPEND
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/normalize_vpk.py" "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk.out")
 

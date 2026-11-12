@@ -8,7 +8,7 @@
  - 汉化版的文字能正常显示，用的是和汉化版在 Windows 上一样的宋体点阵字
  - 画面铺满整个屏幕（960x544），不再只是中间一块 640x480。两侧的黑边会填上，标题、菜单和结局的背景也扩成了 16:9
  - 音乐默认用 WAV，因为 MIDI 在 Vita 上没有声音
- - 去掉了 FPS 显示和开机时的 vitaGL 标志
+ - 去掉了 FPS 显示和开机时的 vitaGL 标志。如果编译时指定了游戏目录，开机时会直接显示扩宽后的载入画面
  - 日文原版和英文数据依然能用，编译时选一个就行
 
 ## 安装
@@ -56,9 +56,15 @@ cd th06-vita
 podman run --rm -v "$PWD":/work -w /work docker.io/vitasdk/vitasdk:2026.08 \
   sh -c 'cmake -S . -B build && cmake --build build'
 ```
-VPK 会生成在 `build/th06-vita.vpk`。只要用的是同一个镜像（`2026.08`），不管克隆到哪个目录，编出来的 VPK 都逐字节相同。
+VPK 会生成在 `build/th06-vita.vpk`。只要用的是同一个镜像（`2026.08`），不管克隆到哪个目录，编出来的 VPK 都逐字节相同（如果指定了游戏目录，游戏数据也得一样，见下文）。
 
 默认编出来的是汉化版用的 VPK。要用日文原版或英文数据，就在第一条 `cmake` 后面加上 `-DTH06_LANG=JP` 或 `-DTH06_LANG=EN`。
+
+想让 Vita 在游戏启动时就显示扩宽后的载入画面，就在编译时指定你的游戏目录。编译时会从 `紅魔郷IN.DAT`（或 `KOUMAKYO_IN.dat`）里读出载入画面，做成启动图（`sce_sys/pic0.png`），所以仓库里不会有游戏的任何东西：
+```
+podman run --rm -v "$PWD":/work -v /path/to/your/th06:/data:ro -w /work docker.io/vitasdk/vitasdk:2026.08 \
+  sh -c 'cmake -S . -B build -DTH06_DATA_DIR=/data && cmake --build build'
+```
 
 不想用容器的话：除了 VitaSDK，还需要编译并安装 [VitaGL](https://github.com/Rinnegatamante/vitaGL/) 和 [Northfear 的 SDL2](https://github.com/Northfear/SDL) fork，以及 Python 3。
 

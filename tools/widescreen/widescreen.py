@@ -8,15 +8,21 @@ the middle at load time (AnmManager.cpp, WidenWithOutpaintedStrips). Steps:
   codex_outpaint.sh     WORK NAME...                an image model fills the magenta -> WORK/codex_out/NAME.png
   widescreen.py strips  WORK/orig WORK/codex_out resources/vita/wide [--preview WORK/preview]
 
+pic0.py makes the VPK's boot image from th06logo's strip at build time (standard library only).
+
 Needs numpy, scipy and Pillow.
 """
 import argparse
+import io
 import os
-import sys
+import tempfile
 
 import numpy as np
 from PIL import Image
-from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter, gaussian_filter1d
+
+import pbg3
+import pic0
 
 BAR = 104  # PillarboxBarWidth() on the Vita: ceil(117 / (725 / 640))
 FEATHER = 6  # must match WidenWithOutpaintedStrips
@@ -30,80 +36,12 @@ BACKGROUNDS = {
 }
 
 
-# --- PBG3 (.DAT) reading, as in src/pbg3 ---
-
-
-class Bits:
-    def __init__(self, data, pos=0):
-        self.d, self.pos, self.mask, self.cur = data, pos, 0x80, 0
-
-    def bit(self):
-        if self.mask == 0x80:
-            self.cur = self.d[self.pos] if self.pos < len(self.d) else 0
-            self.pos += 1
-        b = self.cur & self.mask
-        self.mask = (self.mask >> 1) or 0x80
-        return 1 if b else 0
-
-    def int(self, n):
-        v = 0
-        for _ in range(n):
-            v = (v << 1) | self.bit()
-        return v
-
-    def varint(self):
-        return self.int(((self.bit() << 1) | self.bit()) * 8 + 8)
-
-    def string(self):
-        s = bytearray()
-        while (c := self.int(8)) != 0:
-            s.append(c)
-        return bytes(s)
-
-
-def pbg3_entries(data):
-    b = Bits(data)
-    assert bytes(b.int(8) for _ in range(4)) == b"PBG3", "not a PBG3 archive"
-    n, table = b.varint(), b.varint()
-    b = Bits(data, table)
-    out = {}
-    for _ in range(n):
-        _, _, _, off, size = (b.varint() for _ in range(5))
-        out[b.string().decode("ascii", "replace")] = (off, size)
-    return out
-
-
-def pbg3_read(data, off, size):
-    b, window, head, out = Bits(data, off), bytearray(0x2000), 1, bytearray()
-    while len(out) < size:
-        if b.bit():
-            c = b.int(8)
-            out.append(c)
-            window[head] = c
-            head = (head + 1) & 0x1FFF
-        else:
-            m = b.int(13)
-            if m == 0:
-                break
-            for i in range(b.int(4) + 3):
-                c = window[(m + i) & 0x1FFF]
-                out.append(c)
-                window[head] = c
-                head = (head + 1) & 0x1FFF
-    return bytes(out)
-
-
 def extract(data_dir, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     for part, names in BACKGROUNDS.items():
-        archive = next((os.path.join(data_dir, f) for f in ("紅魔郷%s.DAT" % part, "KOUMAKYO_%s.dat" % part)
-                        if os.path.exists(os.path.join(data_dir, f))), None)
-        if archive is None:
-            sys.exit("no %s archive in %s" % (part, data_dir))
-        data = open(archive, "rb").read()
-        entries = pbg3_entries(data)
+        data, entries = pbg3.open_archive(data_dir, part)
         for name in names:
-            open(os.path.join(out_dir, name + ".jpg"), "wb").write(pbg3_read(data, *entries[name + ".jpg"]))
+            open(os.path.join(out_dir, name + ".jpg"), "wb").write(pbg3.read(data, *entries[name + ".jpg"]))
             print(name)
 
 
@@ -212,6 +150,22 @@ def selftest():
     assert out.shape == (8, 40 + 2 * BAR, 3)
     assert (out[:, BAR + FEATHER:BAR + 40 - FEATHER] == orig[:, FEATHER:40 - FEATHER]).all()
     assert (out[:, :BAR] == strip[:, :BAR]).all() and (out[:, BAR + 40:] == strip[:, BAR + 2 * FEATHER:]).all()
+
+    # pic0.py's stand-ins for Pillow: the same widening, and decoders that agree with Pillow's
+    o, s = orig.tobytes(), strip.tobytes()
+    assert bytes(pic0.widen(40, 8, o, s)[2]) == out.tobytes()
+    im = Image.fromarray(gaussian_filter(rng.integers(0, 256, (48, 64, 3)).astype(float), (3, 3, 0)).astype(np.uint8))
+    for subsampling in (0, 2):
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90, subsampling=subsampling)
+        w, h, rgb = pic0.decode_jpeg(buf.getvalue())
+        ref = np.asarray(Image.open(buf).convert("RGB")).astype(int)
+        mine = np.frombuffer(bytes(rgb), np.uint8).reshape(h, w, 3).astype(int)
+        # 4:2:0 chroma is upsampled nearest-neighbour, not libjpeg's smoothed way; the game's JPEGs are 4:4:4
+        assert np.abs(mine - ref).mean() < (0.25 if subsampling == 0 else 1.5), subsampling
+    with tempfile.NamedTemporaryFile(suffix=".png") as f:
+        im.save(f.name)
+        assert bytes(pic0.read_png_rgb(f.name)[2]) == im.tobytes()
     print("selftest ok")
 
 

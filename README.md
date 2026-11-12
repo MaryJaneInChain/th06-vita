@@ -8,7 +8,7 @@ This fork adds support for the Chinese (汉化) patch, along with a few other ch
  - Text from the Chinese patch shows up properly, in the same SimSun bitmap font the patched game uses on Windows
  - The game fills the whole screen (960x544) instead of a 640x480 box in the middle. The bars on the sides are filled in, and the title, menu and ending backgrounds are widened to 16:9
  - Music defaults to WAV, since MIDI doesn't make any sound on the Vita
- - No FPS counter, and no vitaGL logo when it boots
+ - No FPS counter, and no vitaGL logo when it boots. If you build it with your game folder, it boots into the widened loading screen instead
  - The original Japanese release and English data still work, you just pick which one when building
 
 ## Installation
@@ -56,9 +56,15 @@ cd th06-vita
 podman run --rm -v "$PWD":/work -w /work docker.io/vitasdk/vitasdk:2026.08 \
   sh -c 'cmake -S . -B build && cmake --build build'
 ```
-The VPK ends up at `build/th06-vita.vpk`. As long as you use that exact image (`2026.08`), you get the exact same VPK, byte for byte, no matter where you cloned it.
+The VPK ends up at `build/th06-vita.vpk`. As long as you use that exact image (`2026.08`), you get the exact same VPK, byte for byte, no matter where you cloned it (with the same game folder, if you use one, see below).
 
 By default the VPK is for the Chinese patch. For the original Japanese release or English data, add `-DTH06_LANG=JP` or `-DTH06_LANG=EN` to the first `cmake`.
+
+If you want the Vita to show the widened loading screen while the game boots, point the build at your game folder. It reads the loading screen out of `紅魔郷IN.DAT` (or `KOUMAKYO_IN.dat`) and makes the boot image (`sce_sys/pic0.png`) from it while building, so nothing from the game goes into the repo:
+```
+podman run --rm -v "$PWD":/work -v /path/to/your/th06:/data:ro -w /work docker.io/vitasdk/vitasdk:2026.08 \
+  sh -c 'cmake -S . -B build -DTH06_DATA_DIR=/data && cmake --build build'
+```
 
 If you'd rather not use the container: alongside VitaSDK, you must have [VitaGL](https://github.com/Rinnegatamante/vitaGL/) and [Northfear's SDL2](https://github.com/Northfear/SDL) fork compiled and installed, as well as Python 3.
 
